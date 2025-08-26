@@ -1,8 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+
+    // Public can read artist catalog, only signed-in can write
     match /artists/{doc} {
-      allow read, write: if true; // TEMP: open for smoke test only
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Datasets require auth for read/write (tight by default)
+    match /datasets/{doc} {
+      allow read, write: if isSignedIn();
     }
   }
 }

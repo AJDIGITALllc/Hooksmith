@@ -2,19 +2,91 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Hooksmith — Firebase Smoke Test</title>
+    <title>Hooksmith — Auth + Firestore</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { --bg:#0b0f14; --card:#121821; --ink:#e8eef7; --muted:#9bb0c3; --accent:#6ee7ff; }
+      body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--ink); }
+      .wrap { max-width: 920px; margin: 32px auto; padding: 0 16px; }
+      h1 { font-size: 28px; margin: 0 0 16px; letter-spacing: .3px; }
+      .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+      button { background:var(--accent); color:#001018; border:0; padding:10px 14px; border-radius:12px; font-weight:600; cursor:pointer; }
+      button.sec { background:transparent; border:1px solid #2b3a4c; color:var(--ink); }
+      .card { background:var(--card); padding:16px; border-radius:16px; box-shadow: 0 6px 18px rgba(0,0,0,.25); margin:16px 0; }
+      label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+      input, textarea { width:100%; background:#0d131b; color:var(--ink); border:1px solid #283445; border-radius:12px; padding:10px 12px; outline:none; }
+      textarea { min-height: 88px; resize: vertical; }
+      .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+      pre { background:#0d131b; padding:12px; border-radius:12px; overflow:auto; }
+      .hint { color:var(--muted); font-size:12px; }
+    </style>
   </head>
   <body>
-    <h1>Hooksmith Firebase Smoke Test</h1>
-    <pre id="out">loading…</pre>
+    <div class="wrap">
+      <h1>Hooksmith — Auth + Firestore</h1>
+
+      <div class="card">
+        <div class="row">
+          <button id="login">Sign in with Google</button>
+          <button id="logout" class="sec" style="display:none;">Sign out</button>
+          <div id="user" class="hint">Not signed in</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Upsert Artist</h3>
+          <form id="artist-form">
+            <label>style_id</label>
+            <input name="style_id" placeholder="e.g. bryson_tiller" required />
+            <label>name</label>
+            <input name="name" placeholder="Display name" required />
+            <div style="margin-top:10px" class="row">
+              <button type="submit">Save Artist</button>
+            </div>
+            <div class="hint">Public read; writes require auth.</div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Add Dataset Row</h3>
+          <form id="dataset-form">
+            <label>song_id (optional)</label>
+            <input name="song_id" placeholder="leave blank to auto-id" />
+            <label>title</label>
+            <input name="title" placeholder="Song title" required />
+            <label>themes</label>
+            <input name="themes" placeholder='comma or JSON list' />
+            <label>structure</label>
+            <input name="structure" placeholder="Verse–Chorus, etc." />
+            <label>notes</label>
+            <textarea name="notes" placeholder="annotations / notes"></textarea>
+            <div style="margin-top:10px" class="row">
+              <button type="submit">Add Dataset</button>
+            </div>
+            <div class="hint">Writes are attributed to your UID.</div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Output</h3>
+        <pre id="out">ready</pre>
+      </div>
+    </div>
 
     <script type="module">
-      // ✅ Replace with your config (apiKey can be your public web key)
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-      import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+      import { 
+        getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut 
+      } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+      import {
+        getFirestore, doc, setDoc, collection, addDoc, serverTimestamp
+      } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
+      // Your Firebase project config (public web config)
       const firebaseConfig = {
-        apiKey: "YOUR_WEB_API_KEY",
+        apiKey: "AIzaSyCQJdIaX_6BnsIqPLiOXMQKlz20FGRlpg8",
         authDomain: "gen-lang-client-0960626274.firebaseapp.com",
         projectId: "gen-lang-client-0960626274",
         storageBucket: "gen-lang-client-0960626274.appspot.com",
@@ -23,22 +95,83 @@
       };
 
       const app = initializeApp(firebaseConfig);
-      const db  = getFirestore(app);
+      const auth = getAuth(app);
+      const db   = getFirestore(app);
 
-      const out = document.getElementById('out');
+      const login  = document.getElementById('login');
+      const logout = document.getElementById('logout');
+      const userEl = document.getElementById('user');
+      const out    = document.getElementById('out');
 
-      async function run() {
-        const id = "smoke_" + Date.now();
-        await setDoc(doc(db, "artists", id), {
-          style_id: id,
-          name: "Smoke Test",
-          created_at: new Date().toISOString()
-        });
-        const snap = await getDoc(doc(db, "artists", id));
-        out.textContent = "Wrote + read doc:\n" + JSON.stringify(snap.data(), null, 2);
-      }
+      login.onclick = async () => {
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithPopup(auth, provider);
+        } catch (e) { out.textContent = "Login error: " + e; }
+      };
+      logout.onclick = () => signOut(auth);
 
-      run().catch(e => { out.textContent = "Error: " + e; });
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          userEl.textContent = `Signed in: ${user.displayName || user.email}`;
+          login.style.display  = 'none';
+          logout.style.display = 'inline-block';
+        } else {
+          userEl.textContent = 'Not signed in';
+          login.style.display  = 'inline-block';
+          logout.style.display = 'none';
+        }
+      });
+
+      // Artist form
+      document.getElementById('artist-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const user = auth.currentUser;
+        if (!user) { out.textContent = 'Sign in first.'; return; }
+
+        const style_id = e.target.style_id.value.trim();
+        const name     = e.target.name.value.trim();
+        if (!style_id || !name) { out.textContent = 'style_id and name required'; return; }
+
+        try {
+          await setDoc(doc(db, 'artists', style_id), {
+            style_id, name,
+            owner_uid: user.uid,
+            updated_at: serverTimestamp()
+          }, { merge: true });
+          out.textContent = `✅ Upserted artist: ${style_id}`;
+          e.target.reset();
+        } catch (e) { out.textContent = 'Artist write error: ' + e; }
+      });
+
+      // Dataset form
+      document.getElementById('dataset-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const user = auth.currentUser;
+        if (!user) { out.textContent = 'Sign in first.'; return; }
+
+        const song_id = e.target.song_id.value.trim();
+        const payload = {
+          song_id: song_id || null,
+          owner_uid: user.uid,
+          title: e.target.title.value.trim(),
+          themes: e.target.themes.value.trim(),
+          structure: e.target.structure.value.trim(),
+          notes_annotations: e.target.notes.value.trim(),
+          created_at: serverTimestamp()
+        };
+
+        try {
+          if (song_id) {
+            await setDoc(doc(db, 'datasets', song_id), payload, { merge: true });
+            out.textContent = `✅ Wrote dataset: ${song_id}`;
+          } else {
+            const ref = await addDoc(collection(db, 'datasets'), payload);
+            out.textContent = `✅ Wrote dataset: ${ref.id}`;
+          }
+          e.target.reset();
+        } catch (e) { out.textContent = 'Dataset write error: ' + e; }
+      });
     </script>
   </body>
 </html>
