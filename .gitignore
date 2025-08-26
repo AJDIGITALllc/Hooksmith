@@ -1,0 +1,24 @@
+# Secrets / local only
+service-account.json
+.env
+.env.*.local
+
+# Firebase / tooling temp
+tmp.*.json
+.firebase/
+.firebaserc.local
+
+# Node / build output (if you add a frontend later)
+node_modules/
+dist/
+build/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS / editor
+.DS_Store
+*.swp
+.vscode/
