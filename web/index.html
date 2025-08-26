@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hooksmith — Firebase Smoke Test</title>
+  </head>
+  <body>
+    <h1>Hooksmith Firebase Smoke Test</h1>
+    <pre id="out">loading…</pre>
+
+    <script type="module">
+      // ✅ Replace with your config (apiKey can be your public web key)
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+      import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "YOUR_WEB_API_KEY",
+        authDomain: "gen-lang-client-0960626274.firebaseapp.com",
+        projectId: "gen-lang-client-0960626274",
+        storageBucket: "gen-lang-client-0960626274.appspot.com",
+        appId: "1:650997065313:web:7ddc4b42230830aee6ec20",
+        measurementId: "G-P342F03E4T"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db  = getFirestore(app);
+
+      const out = document.getElementById('out');
+
+      async function run() {
+        const id = "smoke_" + Date.now();
+        await setDoc(doc(db, "artists", id), {
+          style_id: id,
+          name: "Smoke Test",
+          created_at: new Date().toISOString()
+        });
+        const snap = await getDoc(doc(db, "artists", id));
+        out.textContent = "Wrote + read doc:\n" + JSON.stringify(snap.data(), null, 2);
+      }
+
+      run().catch(e => { out.textContent = "Error: " + e; });
+    </script>
+  </body>
+</html>
